@@ -3,8 +3,8 @@ name: Sign APK and Upload Artifact
 on:
   push:
     branches:
-      - main  # Runs on commits to the main branch
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
+      - main
+  workflow_dispatch:
 
 jobs:
   sign-apk:
@@ -30,23 +30,25 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
 
-      - name: Sign the APK
+      - name: Sign APK with apksigner
         run: |
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore my-release-key.jks \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_ALIAS_PASSWORD }}" \
-            "$APK_PATH" ${{ secrets.KEY_ALIAS }}
-
-      - name: Rename Signed APK
-        run: |
-          SIGNED_APK="${APK_PATH//unsigned/foss}"  # Replace "unsigned" with "Foss"
-          mv "$APK_PATH" "$SIGNED_APK"
+          SIGNED_APK="${APK_PATH//unsigned/Foss}"
+          cp "$APK_PATH" "$SIGNED_APK"
+          apksigner sign --ks my-release-key.jks \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.KEY_ALIAS_PASSWORD }} \
+            --out "$SIGNED_APK" "$SIGNED_APK"
           echo "SIGNED_APK=$SIGNED_APK" >> $GITHUB_ENV
+
+      - name: Align the APK (zipalign)
+        run: |
+          ZIPALIGNED_APK="${{ env.SIGNED_APK }}-aligned.apk"
+          zipalign -v 4 "${{ env.SIGNED_APK }}" "$ZIPALIGNED_APK"
+          mv "$ZIPALIGNED_APK" "${{ env.SIGNED_APK }}"
 
       - name: Upload Signed APK as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Signed-APK
           path: ${{ env.SIGNED_APK }}
-          retention-days: 7  # Keep artifact for 7 days
+          retention-days: 7
