@@ -15,6 +15,16 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install Android SDK and apksigner
+        run: |
+          sudo apt update
+          sudo apt install -y zipalign
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk-tools.zip
+          unzip sdk-tools.zip -d android-sdk
+          yes | android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=android-sdk --licenses
+          android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=android-sdk "build-tools;34.0.0"
+          echo "PATH=$PATH:$PWD/android-sdk/build-tools/34.0.0" >> $GITHUB_ENV
+
       - name: Find Unsigned APK
         id: find_apk
         run: |
@@ -32,9 +42,9 @@ jobs:
 
       - name: Sign APK with apksigner
         run: |
-          SIGNED_APK="${APK_PATH//unsigned/Foss}"
+          SIGNED_APK="${APK_PATH//unsigned/foss}"  # Replace "unsigned" with "foss"
           cp "$APK_PATH" "$SIGNED_APK"
-          apksigner sign --ks my-release-key.jks \
+          android-sdk/build-tools/34.0.0/apksigner sign --ks my-release-key.jks \
             --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
             --key-pass pass:${{ secrets.KEY_ALIAS_PASSWORD }} \
             --out "$SIGNED_APK" "$SIGNED_APK"
@@ -43,7 +53,7 @@ jobs:
       - name: Align the APK (zipalign)
         run: |
           ZIPALIGNED_APK="${{ env.SIGNED_APK }}-aligned.apk"
-          zipalign -v 4 "${{ env.SIGNED_APK }}" "$ZIPALIGNED_APK"
+          android-sdk/build-tools/34.0.0/zipalign -v 4 "${{ env.SIGNED_APK }}" "$ZIPALIGNED_APK"
           mv "$ZIPALIGNED_APK" "${{ env.SIGNED_APK }}"
 
       - name: Upload Signed APK as Artifact
