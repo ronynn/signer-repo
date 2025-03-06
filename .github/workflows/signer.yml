@@ -1,9 +1,9 @@
-name: Sign and Release APK
+name: Sign APK and Upload Artifact
 
 on:
   push:
     branches:
-      - main  # Runs when committing to the main branch
+      - main  # Runs on commits to the main branch
   workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
 
 jobs:
@@ -40,18 +40,13 @@ jobs:
 
       - name: Rename Signed APK
         run: |
-          SIGNED_APK="${APK_PATH/unsigned/signed}"
+          SIGNED_APK="${APK_PATH//unsigned/foss}"  # Replace "unsigned" with "Foss"
           mv "$APK_PATH" "$SIGNED_APK"
           echo "SIGNED_APK=$SIGNED_APK" >> $GITHUB_ENV
 
-      - name: Upload to GitHub Releases
-        uses: softprops/action-gh-release@v2
+      - name: Upload Signed APK as Artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: ${{ env.SIGNED_APK }}
-          tag_name: latest
-          name: "Signed APK Release"
-          body: "Automatically signed APK release"
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Signed-APK
+          path: ${{ env.SIGNED_APK }}
+          retention-days: 7  # Keep artifact for 7 days
